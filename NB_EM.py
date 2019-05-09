@@ -8,6 +8,7 @@ import tools
 import os
 import csv
 import math
+from pso import PSO
 from multiprocessing import Process, Pool
 from build_data_managers import DataManager
 from util import *
@@ -44,13 +45,12 @@ def train_WDNB(data_xit, data_deltas):
     return train_hierNB(data_xit, data_deltas)
 
 
-def train_EM(labeled_data_xit, labeled_data_delta, unlabeled_data_xit, max_iter=50,
-             eps=1e-3):
+def train_EM(labeled_data_xit, labeled_data_delta, unlabeled_data_xit):
     # Initialize parameters
     labeled_thetas = train_NB(labeled_data_xit, labeled_data_delta)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), labeled_thetas))
     l = settings.INF
-    for i in range(1, max_iter + 1):
+    for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
         P = predict(thetas, unlabeled_data_xit)
         # M-step: train classifier with the union of labeled and unlabeled data
@@ -62,20 +62,19 @@ def train_EM(labeled_data_xit, labeled_data_delta, unlabeled_data_xit, max_iter=
         l_new = log_prob(thetas_new, labeled_data_xit, labeled_data_delta, unlabeled_data_xit=unlabeled_data_xit)
         l_diff = (l_new - l) / (abs(l) + settings.EPS)
 
-        if l_diff < eps:
+        if l_diff < settings.em_eps:
             break
         l = l_new
         thetas = thetas_new
     return thetas
 
 
-def train_EMMC(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
-                       deltas, max_iter=50, eps=1e-3):
+def train_EMMC(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas):
     # Initialize parameters
     labeled_thetas = train_NBMC(labeled_data_xit, labeled_data_deltas)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), labeled_thetas))
     l = settings.INF
-    for i in range(1, max_iter + 1):
+    for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
         Ps = predict_multicomp(thetas, unlabeled_data_xit, deltas)
         # M-step: train classifier with the union of labeled and unlabeled data
@@ -88,21 +87,20 @@ def train_EMMC(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
                                    unlabeled_data_xit=unlabeled_data_xit)
         l_diff = (l_new - l) / (abs(l) + settings.EPS)
 
-        if l_diff < eps:
+        if l_diff < settings.em_eps:
             break
         l = l_new
         thetas = thetas_new
     return thetas
 
 
-def train_hierEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
-                  deltas=None, max_iter=50, eps=1e-3):
+def train_hierEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas=None):
     # Initialize parameters
     labeled_thetas_list = train_hierNB(labeled_data_xit, labeled_data_deltas)
     thetas_list = list(
         map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), labeled_thetas_list))
     ls = [settings.INF] * len(thetas_list)
-    for i in range(1, max_iter + 1):
+    for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
         Ps = predict_hier(thetas_list, unlabeled_data_xit, deltas)
         # M-step: train classifier with the union of labeled and unlabeled data
@@ -123,20 +121,20 @@ def train_hierEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
             l_diff_abs += abs(ls_new[j] - ls[j]) / abs(ls[j])
             ls[j] = ls_new[j]
 
-        if l_diff < eps or l_diff_abs < eps:
+        if l_diff < settings.em_eps or l_diff_abs < settings.em_eps:
             break
         thetas_list = thetas_list_new
     return thetas_list
 
 
 def train_WDEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
-                           deltas=None, path_weights=None, max_iter=50, eps=1e-3):
+                           deltas=None, path_weights=None):
     # Initialize parameters
     labeled_thetas_list = train_WDNB(labeled_data_xit, labeled_data_deltas)
     thetas_list = list(
         map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), labeled_thetas_list))
     l = settings.INF
-    for i in range(1, max_iter + 1):
+    for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
         Ps = predict_xin_pathscore(thetas_list, unlabeled_data_xit, deltas=deltas, path_weights=path_weights)
         # M-step: train classifier with the union of labeled and unlabeled data
@@ -152,15 +150,14 @@ def train_WDEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
                                        unlabeled_data_xit=unlabeled_data_xit, deltas=deltas, path_weights=path_weights)
         l_diff = (l_new - l) / (abs(l) + settings.EPS)
 
-        if l_diff < eps:
+        if l_diff < settings.em_eps:
             break
         l = l_new
         thetas_list = thetas_list_new
     return thetas_list
 
 
-def train_PCEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas, path_weights,
-                             max_iter=50, eps=1e-3):
+def train_PCEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas, path_weights):
     # Initialize parameters
     labeled_path_score = compute_path_score(labeled_data_deltas, deltas, path_weights)
     labeled_path_label = hardmax(labeled_path_score, axis=1)
@@ -168,7 +165,7 @@ def train_PCEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), labeled_thetas))
     l = settings.INF
     sum_weights = np.sum(path_weights)
-    for i in range(1, max_iter + 1):
+    for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
         Ps = predict_huiru_pathscore(thetas, unlabeled_data_xit, deltas)
         # path_score = compute_path_score([hardmax(p, axis=1) for p in Ps], deltas, path_weights)
@@ -182,7 +179,7 @@ def train_PCEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas
         l_new = log_prob(thetas, labeled_data_xit, labeled_path_label, unlabeled_data_xit=unlabeled_data_xit)
         l_diff = (l_new - l) / (abs(l) + settings.EPS)
 
-        if l_diff < eps:
+        if l_diff < settings.em_eps:
             break
         l = l_new
         thetas = thetas_new
@@ -291,13 +288,13 @@ def log_prob_xin_pathscore(thetas_list, labeled_data_xit, labeled_data_deltas, u
             labeled_delta_matrix = np.multiply(np.expand_dims(labeled_delta_matrix, axis=2),
                                                np.expand_dims(labeled_data_deltas[depth], axis=1))
             labeled_delta_matrix = labeled_delta_matrix.reshape((N, -1))
-        l += np.sum(np.log(np.sum(P_xcs_matrix * labeled_delta_matrix, axis=1)))
+        l += np.sum(logsum(P_xcs_matrix * labeled_delta_matrix, axis=1))
     if unlabeled_data_xit is not None and unlabeled_data_xit.shape[0] > 0:
         P_xcs_matrix = predict_prob_xin_pathscore(thetas_list, unlabeled_data_xit, deltas=deltas,
                                                   path_weights=path_weights)
         N = unlabeled_data_xit[0].shape[0]
         P_xcs_matrix = P_xcs_matrix.reshape(N, -1)
-        l += np.sum(np.log(np.sum(P_xcs_matrix, axis=1)))
+        l += np.sum(logsum(P_xcs_matrix, axis=1))
     return l
 
 
@@ -878,6 +875,44 @@ def run_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, path_
     return thetas_list, test_pres
 
 
+def run_PSO_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, path_weights=None, nos=None):
+    logger = logging.getLogger(__name__)
+    model_name = 'WDNB(PSO)_' + ("soft_" if soft_pathscore else "hard_") + method
+    logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
+
+    if 'labeled' in method:
+        sims = data_managers[0].deltas
+        labels = data_managers[0].labels
+    elif 'dataless' in method:
+        if settings.soft_sim:
+            sims = list(map(lambda sim: normalize(sim, axis=1), data_managers[0].sims))
+        else:
+            sims = list(map(lambda sim: hardmax(sim, axis=1), data_managers[0].sims))
+        labels = list(map(lambda sim: np.argmax(sim, axis=-1), data_managers[0].sims))
+    else:
+        raise NotImplementedError
+    start = time.time()
+    # non_zero_indices = np.nonzero(data_managers[0].xit)
+    # non_zero_columns = sorted(set(non_zero_indices[1]))
+    # thetas_list = train_WDNB(data_managers[0].xit[:,non_zero_columns], sims)
+    thetas_list = train_WDNB(data_managers[0].xit, sims)
+    thetas_list = list(map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), thetas_list))
+    def score_function(path_weights):
+        labeled_pres = predict_label_xin_pathscore(thetas_list, data_managers[0].xit, 
+            deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+        return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
+    pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
+    pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
+    path_weights = pso.get_best_x()
+    logger.info("training time: " + str(time.time() - start))
+    logger.info('best_path_weight: %s' % (str(path_weights)))
+    start = time.time()
+    # test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+    test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
+                                            deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+    logger.info("predicting time: " + str(time.time() - start))
+    return thetas_list, test_pres
+
 def run_WDEM(data_managers, deltas, method='labeled', soft_pathscore=True, path_weights=None):
     logger = logging.getLogger(__name__)
     model_name = 'WDEM_' + ("soft_" if soft_pathscore else "hard_") + method
@@ -898,6 +933,44 @@ def run_WDEM(data_managers, deltas, method='labeled', soft_pathscore=True, path_
                                          path_weights=path_weights)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
+    test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
+                                            deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+    logger.info("predicting time: " + str(time.time() - start))
+    return thetas_list, test_pres
+
+def run_PSO_WDEM(data_managers, deltas, method='labeled', soft_pathscore=True, path_weights=None, nos=None):
+    logger = logging.getLogger(__name__)
+    model_name = 'WDEM(PSO)_' + ("soft_" if soft_pathscore else "hard_") + method
+    logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
+
+    if 'labeled' in method:
+        sims = data_managers[0].deltas
+        labels = data_managers[0].labels
+    elif 'dataless' in method:
+        if settings.soft_sim:
+            sims = list(map(lambda sim: normalize(sim, axis=1), data_managers[0].sims))
+        else:
+            sims = list(map(lambda sim: hardmax(sim, axis=1), data_managers[0].sims))
+        labels = list(map(lambda sim: np.argmax(sim, axis=-1), data_managers[0].sims))
+    else:
+        raise NotImplementedError
+    start = time.time()
+    def score_function(path_weights):
+        thetas_list = train_WDEM(data_managers[0].xit, sims, 
+            data_managers[1].xit, deltas=(None if soft_pathscore else deltas), 
+            path_weights=path_weights)
+        labeled_pres = predict_label_xin_pathscore(thetas_list, data_managers[0].xit,
+            deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+        return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
+    pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
+    pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
+    path_weights = pso.get_best_x()
+    logger.info("training time: " + str(time.time() - start))
+    logger.info('best_path_weight: %s' % (str(path_weights)))
+    start = time.time()
+    thetas_list = train_WDEM(data_managers[0].xit, sims, 
+            data_managers[1].xit, deltas=(None if soft_pathscore else deltas), 
+            path_weights=path_weights)
     test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
@@ -927,6 +1000,49 @@ def run_PCNB(data_managers, deltas, method='labeled', path_weights=None):
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
+    # test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
+    test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
+    logger.info("predicting time: " + str(time.time() - start))
+    return thetas, test_pres
+
+def run_PSO_PCNB(data_managers, deltas, method='labeled', path_weights=None, nos=None):
+    logger = logging.getLogger(__name__)
+    model_name = "PCNB(PSO)_" + method
+    logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
+
+    if 'labeled' in method:
+        sims = data_managers[0].deltas
+        labels = data_managers[0].labels
+    elif 'dataless' in method:
+        if settings.soft_sim:
+            sims = list(map(lambda sim: normalize(sim, axis=1), data_managers[0].sims))
+        else:
+            sims = list(map(lambda sim: hardmax(sim, axis=1), data_managers[0].sims))
+        labels = list(map(lambda sim: np.argmax(sim, axis=-1), data_managers[0].sims))
+    else:
+        raise NotImplementedError
+    start = time.time()
+    def score_function(path_weights):
+        path_score = compute_path_score(sims, deltas, path_weights=path_weights)
+        # non_zero_indices = np.nonzero(data_managers[0].xit)
+        # non_zero_columns = sorted(set(non_zero_indices[1]))
+        # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
+        thetas = train_NB(data_managers[0].xit, path_score)
+        thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
+        labeled_pres = predict_label_huiru_pathscore(thetas, data_managers[0].xit, deltas)
+        return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
+    pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
+    pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
+    path_weights = pso.get_best_x()
+    logger.info("training time: " + str(time.time() - start))
+    logger.info('best_path_weight: %s' % (str(path_weights)))
+    start = time.time()
+    path_score = compute_path_score(sims, deltas, path_weights=path_weights)
+    # non_zero_indices = np.nonzero(data_managers[0].xit)
+    # non_zero_columns = sorted(set(non_zero_indices[1]))
+    # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
+    thetas = train_NB(data_managers[0].xit, path_score)
+    thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
     # test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
     test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
@@ -962,6 +1078,42 @@ def run_PCEM(data_managers, deltas, method='labeled', path_weights=None):
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
 
+def run_PSO_PCEM(data_managers, deltas, method='labeled', path_weights=None, nos=None):
+    logger = logging.getLogger(__name__)
+    model_name = "PCEM(PSO)_" + method
+    logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
+
+    if 'labeled' in method:
+        sims = data_managers[0].deltas
+        labels = data_managers[0].labels
+    elif 'dataless' in method:
+        if settings.soft_sim:
+            sims = list(map(lambda sim: normalize(sim, axis=1), data_managers[0].sims))
+        else:
+            sims = list(map(lambda sim: hardmax(sim, axis=1), data_managers[0].sims))
+        labels = data_managers[0].labels
+    else:
+        raise NotImplementedError
+    start = time.time()
+    def score_function(path_weights):
+        # non_zero_indices = np.nonzero(data_managers[0].xit)
+        # non_zero_columns = sorted(set(non_zero_indices[1]))
+        thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas, path_weights)
+        labeled_pres = predict_label_huiru_pathscore(thetas, data_managers[0].xit, deltas)
+        return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
+    pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
+    pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
+    path_weights = pso.get_best_x()
+    logger.info("training time: " + str(time.time() - start))
+    logger.info('best_path_weight: %s' % (str(path_weights)))
+    start = time.time()
+    # non_zero_indices = np.nonzero(data_managers[0].xit)
+    # non_zero_columns = sorted(set(non_zero_indices[1]))
+    thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas, path_weights)
+    test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
+    logger.info("predicting time: " + str(time.time() - start))
+    return thetas, test_pres
+
 
 def run_classifiers(classifier_name, data_managers, method, **kw):
     if classifier_name == 'check_similarity':
@@ -990,14 +1142,17 @@ def run_classifiers(classifier_name, data_managers, method, **kw):
         elif classifier_name == 'hierNB_hard':
             return run_hierNB(data_managers, deltas=kw['deltas'], soft_hier=False, method=method)
         elif classifier_name == 'WDNB_soft':
-            return run_WDNB(data_managers, deltas=kw['deltas'], soft_pathscore=True,
-                                        path_weights=kw['path_weights'], method=method)
+            return run_WDNB(data_managers, deltas=kw['deltas'], soft_pathscore=True, path_weights=kw['path_weights'], method=method)
+        elif classifier_name == 'WDNB(PSO)_soft':
+            return run_PSO_WDNB(data_managers, deltas=kw['deltas'], soft_pathscore=True, path_weights=kw['path_weights'], nos=kw['nos'], method=method)
         elif classifier_name == 'WDNB_hard':
-            return run_WDNB(data_managers, deltas=kw['deltas'], soft_pathscore=False,
-                                        path_weights=kw['path_weights'], method=method)
+            return run_WDNB(data_managers, deltas=kw['deltas'], soft_pathscore=False, path_weights=kw['path_weights'], method=method)
+        elif classifier_name == 'WDNB(PSO)_hard':
+            return run_PSO_WDNB(data_managers, deltas=kw['deltas'], soft_pathscore=False, path_weights=kw['path_weights'], nos=kw['nos'], method=method)
         elif classifier_name == 'PCNB':
-            return run_PCNB(data_managers, deltas=kw['deltas'], path_weights=kw['path_weights'],
-                                          method=method)
+            return run_PCNB(data_managers, deltas=kw['deltas'], path_weights=kw['path_weights'], method=method)
+        elif classifier_name == 'PCNB(PSO)':
+            return run_PSO_PCNB(data_managers, deltas=kw['deltas'], path_weights=kw['path_weights'], nos=kw['nos'], method=method)
     elif 'EM' in classifier_name:
         if classifier_name == 'flatEM':
             return run_flatEM(data_managers, method=method)
@@ -1014,14 +1169,17 @@ def run_classifiers(classifier_name, data_managers, method, **kw):
         elif classifier_name == 'hierEM_hard':
             return run_hierEM(data_managers, deltas=kw['deltas'], soft_hier=False, method=method)
         elif classifier_name == 'WDEM_soft':
-            return run_WDEM(data_managers, deltas=kw['deltas'], soft_pathscore=True,
-                                        path_weights=kw['path_weights'], method=method)
+            return run_WDEM(data_managers, deltas=kw['deltas'], soft_pathscore=True, path_weights=kw['path_weights'], method=method)
+        elif classifier_name == 'WDEM(PSO)_soft':
+            return run_PSO_WDEM(data_managers, deltas=kw['deltas'], soft_pathscore=True, path_weights=kw['path_weights'], nos=kw['nos'], method=method)
         elif classifier_name == 'WDEM_hard':
-            return run_WDEM(data_managers, deltas=kw['deltas'], soft_pathscore=False,
-                                        path_weights=kw['path_weights'], method=method)
+            return run_WDEM(data_managers, deltas=kw['deltas'], soft_pathscore=False, path_weights=kw['path_weights'], method=method)
+        elif classifier_name == 'WDEM(PSO)_hard':
+            return run_PSO_WDEM(data_managers, deltas=kw['deltas'], soft_pathscore=False, path_weights=kw['path_weights'], nos=kw['nos'], method=method)
         elif classifier_name == 'PCEM':
-            return run_PCEM(data_managers, deltas=kw['deltas'], path_weights=kw['path_weights'],
-                                          method=method)
+            return run_PCEM(data_managers, deltas=kw['deltas'], path_weights=kw['path_weights'], method=method)
+        elif classifier_name == 'PCEM(PSO)':
+            return run_PSO_PCEM(data_managers, deltas=kw['deltas'], path_weights=kw['path_weights'], nos=kw['nos'], method=method)
     raise NotImplementedError('%s is not supported!' % (classifier_name))
 
 
@@ -1035,13 +1193,14 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
 
     if not classifier_names:
         classifier_names = ['check_similarity',
-            'flatNB', 'levelNB', 'NBMC', 'TDNB', 'BUNB', 'hierNB_soft', 'hierNB_hard', 'WDNB_hard', 'PCNB',
-            'flatEM', 'levelEM', 'EMMC', 'TDEM', 'BUEM', 'hierEM_soft', 'hierEM_hard', 'WDEM_hard', 'PCEM']
+            'flatNB', 'levelNB', 'NBMC', 'TDNB', 'BUNB', 'hierNB_soft', 'hierNB_hard', 'WDNB_hard', 'WDNB(PSO)_hard', 'PCNB', 'PCNB(PSO)',
+            'flatEM', 'levelEM', 'EMMC', 'TDEM', 'BUEM', 'hierEM_soft', 'hierEM_hard', 'WDEM_hard', 'WDEM(PSO)_hard', 'PCEM', 'PCEM(PSO)']
     path_weights = [1.0]
     for i in range(1, len(classes)):
         path_weights.append(path_weights[-1] * settings.path_weight)
+    path_weights = np.asarray(path_weights)
     nos, hier_tree = get_hier_info(input_dir)
-    kw = {'deltas': deltas, 'path_weights': path_weights}
+    kw = {'deltas': deltas, 'path_weights': path_weights, 'nos': nos}
     if label_ratio == 1.0:
         times = 1
     for mode in ["labeled", "dataless"]:
@@ -1059,7 +1218,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
                 continue
 
             for j, classifier_name in enumerate(classifier_names):
-                if label_ratio == 1.0 and classifier_name.startswith('EM'):
+                if label_ratio == 1.0 and 'EM' in classifier_name:
                     continue
                 result = run_classifiers(classifier_name, data_managers, mode, **kw)
                 if len(data_managers[2].labels) == len(result[1]):
@@ -1113,13 +1272,13 @@ if __name__ == "__main__":
     logconfig.logging.config.dictConfig(logconfig.logging_config_dict('INFO', log_filename))
 
     classifier_names = [
-        'flatNB', 'levelNB', 'NBMC', 'TDNB', 'WDNB_hard', 'PCNB',
-        'flatEM', 'levelEM', 'EMMC', 'TDEM', 'WDEM_hard', 'PCEM']
+        'flatNB', 'levelNB', 'NBMC', 'TDNB', 'WDNB_hard', 'PCNB', 'WDNB(PSO)_hard', 'PCNB(PSO)',
+        'flatEM', 'levelEM', 'EMMC', 'TDEM', 'WDEM_hard', 'PCEM', 'WDEM(PSO)_hard', 'PCEM(PSO)']
 
     pool = Pool()
     for input_dir in settings.data_dirs:
         for label_ratio in settings.label_ratios:
-            # pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
-            main(input_dir, label_ratio, settings.times, classifier_names)
+            pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
+            # main(input_dir, label_ratio, settings.times, classifier_names)
     pool.close()
     pool.join()

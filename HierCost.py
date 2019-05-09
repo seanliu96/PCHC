@@ -104,7 +104,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
     logger = logging.getLogger(__name__)
     
     vocab_info = tools.load(os.path.join(input_dir, settings.vocab_file))
-    vocab_size = len(vocab_info["vocab_dict"])
+    vocab_size = len(vocab_info["stoi"])
     del vocab_info
     nos, hier_tree = get_hier_info(input_dir)
     if not classifier_names:

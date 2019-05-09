@@ -38,36 +38,38 @@ class DataManager:
         return self._dict[key]
 
 
-def split_label_unlabel(data, index, classes, rate, output_dir, seed=0):
+def split_label_unlabel(data, index, classes, rate, dir_path, seed=0):
     label_idx, unlabel_idx = split_data.split(data, classes, rate, index=index, seed=seed)
-    tools.make_sure_path_exists(output_dir)
-    tools.save(os.path.join(output_dir, 'label_unlabel_idx.npz'), {'label_idx': label_idx, 'unlabel_idx': unlabel_idx})
+    tools.make_sure_path_exists(dir_path)
+    tools.save(os.path.join(dir_path, 'label_unlabel_idx.npz'), {'label_idx': label_idx, 'unlabel_idx': unlabel_idx})
     return label_idx, unlabel_idx
 
 
-def get_vocab_info(doc, labels, train_idx, output_path, sparse_format=False):
-    if os.path.exists(os.path.join(output_path, settings.vocab_file)):
-        vocab_info = tools.load(os.path.join(output_path, settings.vocab_file))
-        if len(vocab_info['vocab_dict']) <= settings.max_vocab_size:
+def get_vocab_info(doc, train_idx, min_freq, max_vocab_size, n_gram, dir_path):
+    if os.path.exists(os.path.join(dir_path, settings.vocab_file)):
+        vocab_info = tools.load(os.path.join(dir_path, settings.vocab_file))
+        if vocab_info['min_freq'] == min_freq and vocab_info['max_vocab_size'] == max_vocab_size \
+            and vocab_info['df'] == len(train_idx) and vocab_info['n_gram'] == n_gram:
             return vocab_info
     tf = Counter()
     data_doc = [doc[i] for i in train_idx]
-    leaf_label = labels[-1][train_idx]
-    for i, x in enumerate(data_doc):
-        for word_tuple in x:
-            word, frequency = word_tuple
-            if sparse_format or (word not in stop_words and not word.isnumeric()):
-                tf[word] += frequency
-
-    vocab_dict = dict()
-    new_tf = Counter()
-    for i, v in enumerate(tf.most_common(settings.max_vocab_size)):
-        vocab_dict[v[0]] = i
-        new_tf[v[0]] = tf[v[0]]
-    tf = new_tf
-    tf["<DF>"] = len(data_doc) # to store the number of documents
-    vocab_info = {"vocab_dict": vocab_dict, "tf": tf}
-    tools.save(os.path.join(output_path, settings.vocab_file), vocab_info)
+    for i, doc in enumerate(data_doc):
+        for tf_tuple in doc:
+            term, frequency = tf_tuple
+            tf[term] += frequency
+    tf_tuples = sorted(tf.items(), key=lambda x: (-x[1], x[0])) # sort by frequency, then alphabetically
+    stoi = dict()
+    itos = dict()
+    valid_term = 0
+    for term, freq in tf_tuples:
+        if freq >= min_freq and valid_term <= max_vocab_size:
+            stoi[term] = valid_term
+            itos[valid_term] = term
+            valid_term += 1
+        else:
+            tf.pop(term)
+    vocab_info = {"min_freq": min_freq, "max_vocab_size": max_vocab_size, 'n_gram': n_gram, "stoi": stoi, "itos": itos, "tf": tf, 'df': len(train_idx)}
+    tools.save(os.path.join(dir_path, settings.vocab_file), vocab_info)
     return vocab_info
 
 
@@ -116,23 +118,28 @@ def process_dataset(input_dir, output_dir, sparse_format=False):
                 sims[depth][i,classes_idx[depth][x_sp[1]]] = float(x_sp[2])
             if depth == len(classes) - 1:
                 if sparse_format:
-                    word_tuples = list(map(lambda x: x.split(':', 1), line[1].split()))
+                    tf_tuples = list(map(lambda x: x.split(':', 1), line[1].split()))
+                    tf_tuples = list(map(lambda tf_tuple: (tf_tuple[0], float(tf_tuple[1]))))
                 else:
-                    word_tuples = list(Counter(line[1].split()).items())
-                word_tuples = list(map(lambda word_tuple: (word_tuple[0], float(word_tuple[1])), word_tuples))
-                doc.append(word_tuples)
+                    words = list(filter(lambda word: not (word in stop_words or word.isnumeric()), line[1].split()))
+                    counter = Counter()
+                    for i in range(len(words)):
+                        term = ' '.join(words[i:i+settings.n_gram])
+                        counter[term] += 1
+                    tf_tuples = list(counter.items())
+                doc.append(tf_tuples)
 
-    vocab_info = get_vocab_info(doc, labels, train_idx, input_dir, sparse_format=sparse_format)
-    vocab_dict = vocab_info['vocab_dict']
-    labeled_data_manager = build_data_manager('labeled', label_idx, doc, labels, deltas, sims, vocab_dict)
-    unlabeled_data_manager = build_data_manager('unlabeled', unlabel_idx, doc, labels, deltas, sims, vocab_dict)
-    test_data_manager = build_data_manager('test', test_idx, doc, labels, deltas, sims, vocab_dict)
+    vocab_info = get_vocab_info(doc, train_idx, settings.min_freq, settings.max_vocab_size, 1 if sparse else settings.n_gram, input_dir)
+    stoi = vocab_info['stoi']
+    labeled_data_manager = build_data_manager('labeled', label_idx, doc, labels, deltas, sims, stoi)
+    unlabeled_data_manager = build_data_manager('unlabeled', unlabel_idx, doc, labels, deltas, sims, stoi)
+    test_data_manager = build_data_manager('test', test_idx, doc, labels, deltas, sims, stoi)
     tools.save(os.path.join(output_dir, settings.labeled_data_manager_file), labeled_data_manager)
     tools.save(os.path.join(output_dir, settings.unlabeled_data_manager_file), unlabeled_data_manager)
     tools.save(os.path.join(output_dir, settings.test_data_manager_file), test_data_manager)
     return [labeled_data_manager, unlabeled_data_manager, test_data_manager], vocab_info
 
-def build_data_manager(name, idx, doc, labels, deltas, sims, vocab_dict, sparse_format=False):
+def build_data_manager(name, idx, doc, labels, deltas, sims, stoi, sparse_format=False):
     data_labels = []
     data_deltas = []
     data_sims = []
@@ -142,20 +149,20 @@ def build_data_manager(name, idx, doc, labels, deltas, sims, vocab_dict, sparse_
             data_deltas.append(deltas[depth][idx])
             data_sims.append(sims[depth][idx])
         data_doc = [doc[i] for i in idx]
-        # get doc word freq
-        data_xit = sparse.lil_matrix((len(data_doc), len(vocab_dict)), dtype=np.float32)
+        # get doc term freq
+        data_xit = sparse.lil_matrix((len(data_doc), len(stoi)), dtype=np.float32)
         
         for i, x in enumerate(data_doc):
-            for word_tuple in x:
-                word, frequency = word_tuple
-                if word in vocab_dict:
-                    data_xit[i, vocab_dict[word]] = frequency
+            for tf_tuple in x:
+                term, frequency = tf_tuple
+                if term in stoi:
+                    data_xit[i, stoi[term]] = frequency
     else:
         for depth in range(len(labels)):
             data_labels.append(np.zeros((0,), dtype=np.int32))
             data_deltas.append(sparse.lil_matrix((0, deltas[depth].shape[1]), dtype=np.float32))
             data_sims.append(sparse.lil_matrix((0, sims[depth].shape[1]), dtype=np.float32))
-            data_xit = sparse.lil_matrix((0, len(vocab_dict)), dtype=np.float32)
+            data_xit = sparse.lil_matrix((0, len(stoi)), dtype=np.float32)
     data_xit = data_xit.tocsc()
     data_manager = DataManager(name, xit=data_xit, labels=data_labels, deltas=data_deltas, sims=data_sims)
     return data_manager
@@ -183,7 +190,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, time=0, sparse_forma
     logger.info(logconfig.key_log(logconfig.FUNCTION_NAME, 'process_dataset'))
     [labeled_data_manager, unlabeled_data_manager, test_data_manager], vocab_info = \
         process_dataset(input_dir, output_dir, sparse_format=sparse_format)
-    logger.info(logconfig.key_log('VocabularySize', str(len(vocab_info['vocab_dict']))))
+    logger.info(logconfig.key_log('VocabularySize', str(len(vocab_info['stoi']))))
             
 if __name__ == "__main__":
     log_filename = os.path.join(settings.log_dir, 'build_data_managers.log')
@@ -194,8 +201,8 @@ if __name__ == "__main__":
         sparse_format = False
         for label_ratio in settings.label_ratios:
             for seed in range(settings.times):
-                # pool.apply_async(main, args=(input_dir, label_ratio, seed, sparse_format))
-                main(input_dir, label_ratio, seed, sparse_format)
+                pool.apply_async(main, args=(input_dir, label_ratio, seed, sparse_format))
+                # main(input_dir, label_ratio, seed, sparse_format)
                 if label_ratio == 1.0:
                     break
     pool.close()

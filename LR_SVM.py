@@ -220,7 +220,7 @@ if __name__ == "__main__":
         classifier_names = ['flatLR', 'levelLR',
                             'flatSVM', 'levelSVM']
         for label_ratio in settings.label_ratios:
-            # pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
-            main(input_dir, label_ratio, settings.times, classifier_names)
+            pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
+            # main(input_dir, label_ratio, settings.times, classifier_names)
     pool.close()
     pool.join()

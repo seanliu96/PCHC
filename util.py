@@ -149,7 +149,7 @@ def softmax(loga, axis=-1):
 
 def logsum(loga, axis=-1):
     """
-    Compute a sum of logs without underflow.
+    Compute log(sum_i a_i) without underflow.
     \log \sum_c e^{b_c} = log [(\sum_c e^{b_c}) e^{-B}e^B]
                         = log [(\sum_c e^{b_c-B}) e^B]
                         = [log(\sum_c e^{b_c-B}) + B
