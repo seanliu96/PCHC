@@ -62,7 +62,7 @@ def get_vocab_info(doc, train_idx, min_freq, max_vocab_size, n_gram, dir_path):
     itos = dict()
     valid_term = 0
     for term, freq in tf_tuples:
-        if freq >= min_freq and valid_term <= max_vocab_size:
+        if freq >= min_freq and valid_term < max_vocab_size:
             stoi[term] = valid_term
             itos[valid_term] = term
             valid_term += 1
@@ -123,7 +123,7 @@ def process_dataset(input_dir, output_dir, sparse_format=False):
                 else:
                     words = list(filter(lambda word: not (word in stop_words or word.isnumeric()), line[1].split()))
                     counter = Counter()
-                    for i in range(len(words)):
+                    for i in range(len(words)+1-settings.n_gram):
                         term = ' '.join(words[i:i+settings.n_gram])
                         counter[term] += 1
                     tf_tuples = list(counter.items())
