@@ -136,7 +136,7 @@ def train_WDEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
     l = settings.INF
     for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
-        Ps = predict_xin_pathscore(thetas_list, unlabeled_data_xit, deltas=deltas, path_weights=path_weights)
+        Ps = predict_WD_pathscore(thetas_list, unlabeled_data_xit, deltas=deltas, path_weights=path_weights)
         # M-step: train classifier with the union of labeled and unlabeled data
         unlabeled_thetas_list = train_WDNB(unlabeled_data_xit, Ps)
         thetas_list_new = []
@@ -146,7 +146,7 @@ def train_WDEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit,
                 thetas_list_new[j].append(
                     normalize_theta(labeled_thetas_list[j][k] + unlabeled_thetas_list[j][k],
                                     axis=0))
-        l_new = log_prob_xin_pathscore(thetas_list_new, labeled_data_xit, labeled_data_deltas,
+        l_new = log_prob_WD_pathscore(thetas_list_new, labeled_data_xit, labeled_data_deltas,
                                        unlabeled_data_xit=unlabeled_data_xit, deltas=deltas, path_weights=path_weights)
         l_diff = (l_new - l) / (abs(l) + settings.EPS)
 
@@ -167,7 +167,7 @@ def train_PCEM(labeled_data_xit, labeled_data_deltas, unlabeled_data_xit, deltas
     sum_weights = np.sum(path_weights)
     for i in range(1, settings.em_max_iter+1):
         # E-step: find the probabilistic labels for unlabeled data
-        Ps = predict_huiru_pathscore(thetas, unlabeled_data_xit, deltas)
+        Ps = predict_PC_pathscore(thetas, unlabeled_data_xit, deltas)
         # path_score = compute_path_score([hardmax(p, axis=1) for p in Ps], deltas, path_weights)
         path_score = compute_path_score(Ps, deltas, path_weights)
         # M-step: train classifier with the union of labeled and unlabeled data
@@ -275,11 +275,11 @@ def log_prob_hier(thetas_list, labeled_data_xit, labeled_data_deltas, unlabeled_
     return ls
 
 
-def log_prob_xin_pathscore(thetas_list, labeled_data_xit, labeled_data_deltas, unlabeled_data_xit=None, 
+def log_prob_WD_pathscore(thetas_list, labeled_data_xit, labeled_data_deltas, unlabeled_data_xit=None, 
                            deltas=None, path_weights=None):
     l = 0.0
     if labeled_data_xit is not None:
-        P_xcs_matrix = predict_prob_xin_pathscore(thetas_list, labeled_data_xit, deltas=deltas,
+        P_xcs_matrix = predict_prob_WD_pathscore(thetas_list, labeled_data_xit, deltas=deltas,
                                                   path_weights=path_weights)
         N = labeled_data_xit.shape[0]
         P_xcs_matrix = P_xcs_matrix.reshape(N, -1)
@@ -290,7 +290,7 @@ def log_prob_xin_pathscore(thetas_list, labeled_data_xit, labeled_data_deltas, u
             labeled_delta_matrix = labeled_delta_matrix.reshape((N, -1))
         l += np.sum(logsum(P_xcs_matrix * labeled_delta_matrix, axis=1))
     if unlabeled_data_xit is not None and unlabeled_data_xit.shape[0] > 0:
-        P_xcs_matrix = predict_prob_xin_pathscore(thetas_list, unlabeled_data_xit, deltas=deltas,
+        P_xcs_matrix = predict_prob_WD_pathscore(thetas_list, unlabeled_data_xit, deltas=deltas,
                                                   path_weights=path_weights)
         N = unlabeled_data_xit[0].shape[0]
         P_xcs_matrix = P_xcs_matrix.reshape(N, -1)
@@ -375,7 +375,7 @@ def predict_hier(thetas_list, data_xit, deltas=None):
     return Ps
 
 
-def predict_prob_xin_pathscore(thetas_list, data_xit, deltas=None, path_weights=None):
+def predict_prob_WD_pathscore(thetas_list, data_xit, deltas=None, path_weights=None):
     P_xcs = []
     classes_size = []
     N = data_xit.shape[0]
@@ -409,8 +409,8 @@ def predict_prob_xin_pathscore(thetas_list, data_xit, deltas=None, path_weights=
     return P_xcs_matrix
 
 
-def predict_xin_pathscore(thetas_list, data_xit, deltas=None, path_weights=None):
-    P_xcs_matrix = predict_prob_xin_pathscore(thetas_list, data_xit, deltas=deltas, path_weights=path_weights)
+def predict_WD_pathscore(thetas_list, data_xit, deltas=None, path_weights=None):
+    P_xcs_matrix = predict_prob_WD_pathscore(thetas_list, data_xit, deltas=deltas, path_weights=path_weights)
     N = P_xcs_matrix.shape[0]
     classes_size = P_xcs_matrix.shape[1:]
     Ps = []
@@ -423,7 +423,7 @@ def predict_xin_pathscore(thetas_list, data_xit, deltas=None, path_weights=None)
     return Ps
 
 
-def predict_huiru_pathscore(thetas, data_xit, deltas):
+def predict_PC_pathscore(thetas, data_xit, deltas):
     Ps = []
     P_bottom = predict(thetas, data_xit)
     Ps.append(P_bottom)
@@ -443,13 +443,13 @@ def predict_label_hier(thetas_list, data_xit, deltas=None):
     return y_pres
 
 
-def predict_label_xin_pathscore(thetas_list, data_xit, deltas=None, path_weights=None):
+def predict_label_WD_pathscore(thetas_list, data_xit, deltas=None, path_weights=None):
     data_xit_csr = data_xit.tocsr()
     y_pres = [None for k in range(len(thetas_list))]
     batch_size = 512
     for i in range(0, data_xit.shape[0], batch_size):
         j = min(i + batch_size, data_xit.shape[0])
-        Ps = predict_xin_pathscore(thetas_list, data_xit_csr[i:j, :], deltas=deltas, path_weights=path_weights)
+        Ps = predict_WD_pathscore(thetas_list, data_xit_csr[i:j, :], deltas=deltas, path_weights=path_weights)
         for k in range(len(Ps)):
             if y_pres[k] is None:
                 y_pres[k] = np.argmax(Ps[k], axis=1)
@@ -458,8 +458,8 @@ def predict_label_xin_pathscore(thetas_list, data_xit, deltas=None, path_weights
     return y_pres
 
 
-def predict_label_huiru_pathscore(thetas, data_xit, deltas):
-    Ps = predict_huiru_pathscore(thetas, data_xit, deltas)
+def predict_label_PC_pathscore(thetas, data_xit, deltas):
+    Ps = predict_PC_pathscore(thetas, data_xit, deltas)
     y_pres = []
     y_bottom = np.argmax(Ps[-1], axis=1)
     y_pres.append(y_bottom)
@@ -868,8 +868,8 @@ def run_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, path_
     thetas_list = list(map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), thetas_list))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
-    test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
+    # test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+    test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas_list, test_pres
@@ -898,7 +898,7 @@ def run_PSO_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, p
     thetas_list = train_WDNB(data_managers[0].xit, sims)
     thetas_list = list(map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), thetas_list))
     def score_function(path_weights):
-        labeled_pres = predict_label_xin_pathscore(thetas_list, data_managers[0].xit, 
+        labeled_pres = predict_label_WD_pathscore(thetas_list, data_managers[0].xit, 
             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
         return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
     pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
@@ -907,8 +907,8 @@ def run_PSO_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, p
     logger.info("training time: " + str(time.time() - start))
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
-    # test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
-    test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
+    # test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
+    test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas_list, test_pres
@@ -933,7 +933,7 @@ def run_WDEM(data_managers, deltas, method='labeled', soft_pathscore=True, path_
                                          path_weights=path_weights)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
+    test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas_list, test_pres
@@ -959,7 +959,7 @@ def run_PSO_WDEM(data_managers, deltas, method='labeled', soft_pathscore=True, p
         thetas_list = train_WDEM(data_managers[0].xit, sims, 
             data_managers[1].xit, deltas=(None if soft_pathscore else deltas), 
             path_weights=path_weights)
-        labeled_pres = predict_label_xin_pathscore(thetas_list, data_managers[0].xit,
+        labeled_pres = predict_label_WD_pathscore(thetas_list, data_managers[0].xit,
             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
         return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
     pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
@@ -971,7 +971,7 @@ def run_PSO_WDEM(data_managers, deltas, method='labeled', soft_pathscore=True, p
     thetas_list = train_WDEM(data_managers[0].xit, sims, 
             data_managers[1].xit, deltas=(None if soft_pathscore else deltas), 
             path_weights=path_weights)
-    test_pres = predict_label_xin_pathscore(thetas_list, data_managers[2].xit,
+    test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas_list, test_pres
@@ -1000,8 +1000,8 @@ def run_PCNB(data_managers, deltas, method='labeled', path_weights=None):
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
-    test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
+    # test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
+    test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
 
@@ -1029,7 +1029,7 @@ def run_PSO_PCNB(data_managers, deltas, method='labeled', path_weights=None, nos
         # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
         thetas = train_NB(data_managers[0].xit, path_score)
         thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
-        labeled_pres = predict_label_huiru_pathscore(thetas, data_managers[0].xit, deltas)
+        labeled_pres = predict_label_PC_pathscore(thetas, data_managers[0].xit, deltas)
         return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
     pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
     pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
@@ -1043,8 +1043,8 @@ def run_PSO_PCNB(data_managers, deltas, method='labeled', path_weights=None, nos
     # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
     thetas = train_NB(data_managers[0].xit, path_score)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
-    # test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
-    test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
+    # test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
+    test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
 
@@ -1074,7 +1074,7 @@ def run_PCEM(data_managers, deltas, method='labeled', path_weights=None):
     #     logger.info(str(iterdetails[i]))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
+    test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
 
@@ -1099,7 +1099,7 @@ def run_PSO_PCEM(data_managers, deltas, method='labeled', path_weights=None, nos
         # non_zero_indices = np.nonzero(data_managers[0].xit)
         # non_zero_columns = sorted(set(non_zero_indices[1]))
         thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas, path_weights)
-        labeled_pres = predict_label_huiru_pathscore(thetas, data_managers[0].xit, deltas)
+        labeled_pres = predict_label_PC_pathscore(thetas, data_managers[0].xit, deltas)
         return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
     pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
     pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
@@ -1110,7 +1110,7 @@ def run_PSO_PCEM(data_managers, deltas, method='labeled', path_weights=None, nos
     # non_zero_indices = np.nonzero(data_managers[0].xit)
     # non_zero_columns = sorted(set(non_zero_indices[1]))
     thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas, path_weights)
-    test_pres = predict_label_huiru_pathscore(thetas, data_managers[2].xit, deltas)
+    test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
 
