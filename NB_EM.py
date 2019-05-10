@@ -1213,6 +1213,11 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
             logger.info(logconfig.key_log(logconfig.START_PROGRAM, sub_dir))
 
             data_managers = load_data_managers(sub_dir)
+            if settings.reduce_features:
+                non_zero_indices = np.nonzero(data_managers[0].xit)
+                non_zero_columns = sorted(set(non_zero_indices[1]))
+                for data_manager in data_managers:
+                    data_manager.xit = data_manager.xit[:,non_zero_columns]
 
             if mode == "dataless" and np.max(data_managers[2].sims[0][0]) == 0.0:
                 continue

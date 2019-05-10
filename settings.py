@@ -48,6 +48,8 @@ test_svmlight_file = 'test_svmlight.txt'
 # 1: micro
 main_metric=1
 
+reduce_features = True
+
 em_max_iter = 50
 em_eps = 1e-3
 path_weight = 1.0

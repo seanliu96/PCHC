@@ -443,13 +443,14 @@ def train_PC(data_xit, path_score, method):
         model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
     elif 'SVM' in method:
         model = CalibratedClassifierCV(LinearSVC(multi_class='crammer_singer'))
+    data_xit_csr = data_xit.tocsr()
     data_xit_expanded = []
     sample_weight = []
     label_expanded = []
     for i in range(path_score.shape[0]):
         for j in range(path_score.shape[1]):
             if path_score[i][j] > 0:
-                data_xit_expanded.append(data_xit.getrow(i))
+                data_xit_expanded.append(data_xit_csr.getrow(i))
                 sample_weight.append(path_score[i][j])
                 label_expanded.append(j)
     data_xit_expanded = vstack(data_xit_expanded)
@@ -466,7 +467,10 @@ def predict_PC_pathscore(model, data_xit, deltas):
     P_bottom = model.predict_proba(data_xit)
     Ps.append(P_bottom)
     for depth in range(len(deltas) - 2, -1, -1):
-        P_high = normalize(np.dot(P_bottom, deltas[depth].T), axis=1)
+        try:
+            P_high = normalize(np.dot(P_bottom, deltas[depth].T), axis=1)
+        except ValueError:
+            P_high = normalize(np.ones((P_bottom.shape[0], deltas[depth].shape[0])), axis=1)
         Ps.append(P_high)
         P_bottom = P_high
     Ps.reverse()
@@ -625,6 +629,11 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
             logger.info(logconfig.key_log(logconfig.START_PROGRAM, sub_dir))
 
             data_managers = load_data_managers(sub_dir)
+            if settings.reduce_features:
+                non_zero_indices = np.nonzero(data_managers[0].xit)
+                non_zero_columns = sorted(set(non_zero_indices[1]))
+                for data_manager in data_managers:
+                    data_manager.xit = data_manager.xit[:,non_zero_columns]
 
             if mode == "dataless" and np.max(data_managers[2].sims[0][0]) == 0.0:
                 continue
@@ -679,7 +688,7 @@ if __name__ == "__main__":
     log_filename = os.path.join(settings.log_dir, 'LR_SVM.log')
     logconfig.logging.config.dictConfig(logconfig.logging_config_dict('INFO', log_filename))
 
-    pool = Pool(10)
+    pool = Pool(20)
     for input_dir in settings.data_dirs:
         classifier_names = ['flatLR', 'levelLR', 'TDLR', 'BULR', 'WDLR_hard', 'PCLR', 
                             'flatSVM', 'levelSVM', 'TDSVM', 'BUSVM', 'WDSVM_hard', 'PCSVM']
