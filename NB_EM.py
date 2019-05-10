@@ -497,14 +497,10 @@ def run_flatNB(data_managers, method='labeled'):
         raise NotImplementedError
 
     start = time.time()
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], sim)
     thetas = train_NB(data_managers[0].xit, sim)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # y_pre = predict_label(thetas, data_managers[2].xit[:,non_zero_columns])
     y_pre = predict_label(thetas, data_managers[2].xit)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, y_pre
@@ -554,16 +550,12 @@ def run_levelNB(data_managers, method='labeled'):
     start = time.time()
     max_depth = len(sims)
     for depth in range(max_depth):
-        # non_zero_indices = np.nonzero(data_managers[0].xit)
-        # non_zero_columns = sorted(set(non_zero_indices[1]))
-        # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], sims[depth])
         thetas = train_NB(data_managers[0].xit, sims[depth])
         thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
         thetas_list.append(thetas)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
     for depth in range(max_depth):
-        # y_pre = predict_label(thetas_list[depth], data_managers[2].xit[:,non_zero_columns])
         y_pre = predict_label(thetas_list[depth], data_managers[2].xit)
         y_pres.append(y_pre)
     logger.info("predicting time: " + str(time.time() - start))
@@ -616,14 +608,10 @@ def run_hierNB(data_managers, deltas, method='labeled', soft_hier=True):
         raise NotImplementedError
 
     start = time.time()
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas_list = train_hierNB(data_managers[0].xit[:,non_zero_columns], sims)
     thetas_list = train_hierNB(data_managers[0].xit, sims)
     thetas_list = list(map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), thetas_list))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_hier(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_hier else deltas))
     test_pres = predict_label_hier(thetas_list, data_managers[2].xit, deltas=(None if soft_hier else deltas))
     logger.info("predicting time: " + str(time.time() - start))
     return thetas_list, test_pres
@@ -667,14 +655,10 @@ def run_NBMC(data_managers, deltas, method='labeled'):
     else:
         raise NotImplementedError
     start = time.time()
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas = train_NBMC(data_managers[0].xit[:,non_zero_columns], sims)
     thetas = train_NBMC(data_managers[0].xit, sims)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # y_pres = predict_label_multicomp(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
     y_pres = predict_label_multicomp(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, y_pres
@@ -720,14 +704,10 @@ def run_TDNB(data_managers, deltas, method='labeled'):
     thetas_lists = []
     unlabeled_pres = []
     test_pres = []
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
     data_managers_d0 = [
-        # DataManager(data_managers[0].name + '_d0', xit=data_managers[0].xit[:,non_zero_columns], labels=data_managers[0].labels, 
         DataManager(data_managers[0].name + '_d0', xit=data_managers[0].xit, labels=data_managers[0].labels,
                     deltas=data_managers[0].deltas, sims=data_managers[0].sims, true_idx=None),
         None,
-        # DataManager(data_managers[2].name + '_d0', xit=data_managers[2].xit[:,non_zero_columns], labels=data_managers[2].labels, 
         DataManager(data_managers[2].name + '_d0', xit=data_managers[2].xit, labels=data_managers[2].labels,
                     deltas=data_managers[2].deltas, sims=data_managers[2].sims, true_idx=None)]
     data_managers_list = [data_managers_d0]
@@ -861,14 +841,10 @@ def run_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, path_
     else:
         raise NotImplementedError
     start = time.time()
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas_list = train_WDNB(data_managers[0].xit[:,non_zero_columns], sims)
     thetas_list = train_WDNB(data_managers[0].xit, sims)
     thetas_list = list(map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), thetas_list))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
@@ -892,9 +868,6 @@ def run_PSO_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, p
     else:
         raise NotImplementedError
     start = time.time()
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas_list = train_WDNB(data_managers[0].xit[:,non_zero_columns], sims)
     thetas_list = train_WDNB(data_managers[0].xit, sims)
     thetas_list = list(map(lambda thetas: list(map(lambda theta: normalize_theta(theta, axis=0), thetas)), thetas_list))
     def score_function(path_weights):
@@ -907,7 +880,6 @@ def run_PSO_WDNB(data_managers, deltas, method='labeled', soft_pathscore=True, p
     logger.info("training time: " + str(time.time() - start))
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
-    # test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     test_pres = predict_label_WD_pathscore(thetas_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
@@ -993,14 +965,10 @@ def run_PCNB(data_managers, deltas, method='labeled', path_weights=None):
         raise NotImplementedError
     start = time.time()
     path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
     thetas = train_NB(data_managers[0].xit, path_score)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
     test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
@@ -1024,9 +992,6 @@ def run_PSO_PCNB(data_managers, deltas, method='labeled', path_weights=None, nos
     start = time.time()
     def score_function(path_weights):
         path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-        # non_zero_indices = np.nonzero(data_managers[0].xit)
-        # non_zero_columns = sorted(set(non_zero_indices[1]))
-        # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
         thetas = train_NB(data_managers[0].xit, path_score)
         thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
         labeled_pres = predict_label_PC_pathscore(thetas, data_managers[0].xit, deltas)
@@ -1038,12 +1003,8 @@ def run_PSO_PCNB(data_managers, deltas, method='labeled', path_weights=None, nos
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
     path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
-    # thetas = train_NB(data_managers[0].xit[:,non_zero_columns], path_score)
     thetas = train_NB(data_managers[0].xit, path_score)
     thetas = list(map(lambda theta: normalize_theta(theta, axis=0), thetas))
-    # test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit[:,non_zero_columns], deltas)
     test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return thetas, test_pres
@@ -1065,8 +1026,6 @@ def run_PCEM(data_managers, deltas, method='labeled', path_weights=None):
         raise NotImplementedError
     start = time.time()
     path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
     thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas,
                                                    path_weights)
     # logger.info("Test results(iter, depth, l_diff, macro_f1, micro_f1):")
@@ -1096,8 +1055,6 @@ def run_PSO_PCEM(data_managers, deltas, method='labeled', path_weights=None, nos
         raise NotImplementedError
     start = time.time()
     def score_function(path_weights):
-        # non_zero_indices = np.nonzero(data_managers[0].xit)
-        # non_zero_columns = sorted(set(non_zero_indices[1]))
         thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas, path_weights)
         labeled_pres = predict_label_PC_pathscore(thetas, data_managers[0].xit, deltas)
         return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
@@ -1107,8 +1064,6 @@ def run_PSO_PCEM(data_managers, deltas, method='labeled', path_weights=None, nos
     logger.info("training time: " + str(time.time() - start))
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
     thetas = train_PCEM(data_managers[0].xit, sims, data_managers[1].xit, deltas, path_weights)
     test_pres = predict_label_PC_pathscore(thetas, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
@@ -1269,7 +1224,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
             csv_writer.writerow(['Micro f1 avg'] + list(avg_m_metrics_result[1, :, 2]))
             csv_writer.writerow(['Micro f1 std'] + list(std_m_metrics_result[1, :, 2]))
             csv_writer.writerow([])
-    logger.info(logconfig.key_log(logconfig.END_PROGRAM, input_dir))
+    logger.info(logconfig.key_log(logconfig.END_PROGRAM, sub_dir))
 
 
 if __name__ == "__main__":
@@ -1277,8 +1232,8 @@ if __name__ == "__main__":
     logconfig.logging.config.dictConfig(logconfig.logging_config_dict('INFO', log_filename))
 
     classifier_names = [
-        'flatNB', 'levelNB', 'NBMC', 'TDNB', 'WDNB_hard', 'PCNB', 'WDNB(PSO)_hard', 'PCNB(PSO)',
-        'flatEM', 'levelEM', 'EMMC', 'TDEM', 'WDEM_hard', 'PCEM', 'WDEM(PSO)_hard', 'PCEM(PSO)']
+        'flatNB', 'NBMC', 'TDNB', 'WDNB_hard', 'PCNB', 'WDNB(PSO)_hard', 'PCNB(PSO)',
+        'flatEM', 'EMMC', 'TDEM', 'WDEM_hard', 'PCEM', 'WDEM(PSO)_hard', 'PCEM(PSO)']
 
     pool = Pool()
     for input_dir in settings.data_dirs:

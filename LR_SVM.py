@@ -38,39 +38,29 @@ def run_leaf(data_managers, deltas, method='LR_labeled'):
 
     start = time.time()
     max_depth = len(sims)
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
     if 'LR' in method:
         model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
     elif 'SVM' in method:
         model = LinearSVC(multi_class='crammer_singer')
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
-        # tf_idf.fit(data_managers[0].xit[:,non_zero_columns])
         tf_idf.fit(data_managers[0].xit)
-        # model.fit(tf_idf.transform(data_managers[0].xit[:,non_zero_columns]), np.argmax(sims[-1], axis=1))
         model.fit(tf_idf.transform(data_managers[0].xit), np.argmax(sims[-1], axis=1))
     else:
-        # model.fit(data_managers[0].xit[:,non_zero_columns], np.argmax(sims[-1], axis=1))
         model.fit(data_managers[0].xit, np.argmax(sims[-1], axis=1))
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
     if 'tf-idf' in method:
-        # test_pre = model.predict(tf_idf.transform(data_managers[2].xit[:, non_zero_columns]))
         test_pre = model.predict(tf_idf.transform(data_managers[2].xit))
     else:
-        # test_pre = model.predict(data_managers[2].xit[:, non_zero_columns])
         test_pre = model.predict(data_managers[2].xit)
     logger.info("predicting time: " + str(time.time() - start))
     return model, test_pre
 
 def train_level(data_xit, sims, method='LR_labeled'):
     model_list = []
-    # non_zero_indices = np.nonzero(data_xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
-        # tf_idf.fit(data_xit[:,non_zero_columns])
         tf_idf.fit(data_xit)
     else:
         tf_idf = None
@@ -80,10 +70,8 @@ def train_level(data_xit, sims, method='LR_labeled'):
         elif 'SVM' in method:
             model = LinearSVC(multi_class='crammer_singer')
         if 'tf-idf' in method:
-            # model.fit(tf_idf.transform(data_xit[:,non_zero_columns]), np.argmax(sims[depth], axis=1))
             model.fit(tf_idf.transform(data_xit), np.argmax(sims[depth], axis=1))
         else:
-            # model.fit(data_xit[:,non_zero_columns], np.argmax(sims[depth], axis=1))
             model.fit(data_xit, np.argmax(sims[depth], axis=1))
         model_list.append(model)
     return model_list
@@ -111,10 +99,8 @@ def run_level(data_managers, deltas, method='LR_labeled'):
     start = time.time()
     for depth in range(len(sims)):
         if 'tf-idf' in method:
-            # test_pre = model_list[depth].predict(tf_idf.transform(data_managers[2].xit[:, non_zero_columns]))
             test_pre = model_list[depth].predict(tf_idf.transform(data_managers[2].xit))
         else:
-            # test_pre = model_list[depth].predict(data_managers[2].xit[:, non_zero_columns])
             test_pre = model_list[depth].predict(data_managers[2].xit)
         test_pres.append(test_pre)
     logger.info("predicting time: " + str(time.time() - start))
@@ -154,11 +140,8 @@ def train_one_depth(data_managers_list, depth, deltas, method):
             model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
             model = LinearSVC(multi_class='crammer_singer')
-        # non_zero_indices = np.nonzero(data_managers[0].xit)
-        # non_zero_columns = sorted(set(non_zero_indices[1]))
         if 'tf-idf' in method:
             tf_idf = TfidfTransformer()
-            # tf_idf.fit(data_managers[0].xit[:,non_zero_columns])
             tf_idf.fit(data_managers[0].xit)
             label = np.argmax(sim, axis=1)
             unique_label = np.unique(label)
@@ -171,12 +154,15 @@ def train_one_depth(data_managers_list, depth, deltas, method):
                 # unlabeled_pre_part = np.array([unique_label[0]] * (data_managers[1].xit.shape[0] if data_managers[1] else 0))
                 test_pre_part = np.array([unique_label[0]] * data_managers[2].xit.shape[0])
             else:
-                # model.fit(tf_idf.transform(data_managers[0].xit[:,non_zero_columns]), label)
-                # unlabeled_pre_part = model.predict(tf_idf.transform(data_managers[1].xit[:,non_zero_columns]))
-                # test_pre_part = model.predict(tf_idf.transform(data_managers[2].xit[:,non_zero_columns]))
                 model.fit(tf_idf.transform(data_managers[0].xit), label)
-                # unlabeled_pre_part = model.predict(tf_idf.transform(data_managers[1].xit))
-                test_pre_part = model.predict(tf_idf.transform(data_managers[2].xit))
+                # if data_managers[1].xit.shape[0] > 0:
+                #     unlabeled_pre_part = model.predict(tf_idf.transform(data_managers[1].xit))
+                # else:
+                #     unlabeled_pre_part = []
+                if data_managers[2].xit.shape[0] > 0:
+                    test_pre_part = model.predict(tf_idf.transform(data_managers[2].xit))
+                else:
+                    test_pre_part = []
         else:
             tf_idf = None
             label = np.argmax(sim, axis=1)
@@ -190,12 +176,15 @@ def train_one_depth(data_managers_list, depth, deltas, method):
                 # unlabeled_pre_part = np.array([unique_label[0]] * (data_managers[1].xit.shape[0] if data_managers[1] else 0))
                 test_pre_part = np.array([unique_label[0]] * data_managers[2].xit.shape[0])
             else:
-                # model.fit(data_managers[0].xit[:,non_zero_columns], label)
-                # unlabeled_pre_part = model.predict(data_managers[1].xit[:,non_zero_columns])
-                # test_pre_part = model.predict(data_managers[2].xit[:,non_zero_columns])
                 model.fit(data_managers[0].xit, label)
-                # unlabeled_pre_part = model.predict(data_managers[1].xit)
-                test_pre_part = model.predict(data_managers[2].xit)
+                # if data_managers[1].xit.shape[0] > 0:
+                #     unlabeled_pre_part = model.predict(data_managers[1].xit)
+                # else:
+                #     unlabeled_pre_part = []
+                if data_managers[2].xit.shape[0] > 0:
+                    test_pre_part = model.predict(data_managers[2].xit)
+                else:
+                    test_pre_part = []
         model_list.append(model)
         if depth != 0:
             # unlabeled_pre_part = np.array([next_labels[x] for x in unlabeled_pre_part])
@@ -232,20 +221,16 @@ def run_TD(data_managers, deltas, method='LR_labeled'):
 
     start = time.time()
     max_depth = len(deltas)
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
+    
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
-        # tf_idf.fit(data_managers[0].xit[:,non_zero_columns])
         tf_idf.fit(data_managers[0].xit)
     else:
         tf_idf = None
     data_managers_d0 = [
-        # DataManager(data_managers[0].name + '_d0', xit=data_managers[0].xit[:,non_zero_columns], labels=data_managers[0].labels, 
         DataManager(data_managers[0].name + '_d0', xit=data_managers[0].xit, labels=data_managers[0].labels,
                     deltas=data_managers[0].deltas, sims=data_managers[0].sims, true_idx=None),
         None,
-        # DataManager(data_managers[2].name + '_d0', xit=data_managers[2].xit[:,non_zero_columns], labels=data_managers[2].labels, 
         DataManager(data_managers[2].name + '_d0', xit=data_managers[2].xit, labels=data_managers[2].labels,
                     deltas=data_managers[2].deltas, sims=data_managers[2].sims, true_idx=None)]
     data_managers_list = [data_managers_d0]
@@ -293,11 +278,8 @@ def run_BU(data_managers, deltas, method='LR_labeled'):
 
 def train_WD(data_xit, sims, method):
     model_list = []
-    # non_zero_indices = np.nonzero(data_xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
-        # tf_idf.fit(data_xit[:,non_zero_columns])
         tf_idf.fit(data_xit)
     else:
         tf_idf = None
@@ -307,10 +289,8 @@ def train_WD(data_xit, sims, method):
         elif 'SVM' in method:
             model = CalibratedClassifierCV(LinearSVC(multi_class='crammer_singer'))
         if 'tf-idf' in method:
-            # model.fit(tf_idf.transform(data_xit[:,non_zero_columns]), np.argmax(sims[depth], axis=1))
             model.fit(tf_idf.transform(data_xit), np.argmax(sims[depth], axis=1))
         else:
-            # model.fit(data_xit[:,non_zero_columns], np.argmax(sims[depth], axis=1))
             model.fit(data_xit, np.argmax(sims[depth], axis=1))
         model_list.append(model)
     return model_list
@@ -390,7 +370,6 @@ def run_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, path
     model_list = train_WD(data_managers[0].xit, sims, method)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_WD_pathscore(model_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     test_pres = predict_label_WD_pathscore(model_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
@@ -424,18 +403,15 @@ def run_PSO_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, 
     logger.info("training time: " + str(time.time() - start))
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
-    # test_pres = predict_label_WD_pathscore(model_list, data_managers[2].xit[:,non_zero_columns], deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     test_pres = predict_label_WD_pathscore(model_list, data_managers[2].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
     logger.info("predicting time: " + str(time.time() - start))
     return model_list, test_pres
 
 def train_PC(data_xit, path_score, method):
-    # non_zero_indices = np.nonzero(data_managers[0].xit)
-    # non_zero_columns = sorted(set(non_zero_indices[1]))
+    
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
-        # tf_idf.fit(data_managers[0].xit[:,non_zero_columns])
         tf_idf.fit(data_managers[0].xit)
     else:
         tf_idf = None
@@ -455,10 +431,8 @@ def train_PC(data_xit, path_score, method):
                 label_expanded.append(j)
     data_xit_expanded = vstack(data_xit_expanded)
     if 'tf-idf' in method:
-        # model.fit(tf_idf.transform(data_xit_expanded[:,non_zero_columns]), label_expanded, sample_weight=sample_weight)
         model.fit(tf_idf.transform(data_xit_expanded), label_expanded, sample_weight=sample_weight)
     else:
-        # model.fit(data_xit_expanded[:,non_zero_columns], label_expanded, sample_weight=sample_weight)
         model.fit(data_xit_expanded, label_expanded, sample_weight=sample_weight)
     return model
 
@@ -507,7 +481,6 @@ def run_PC(data_managers, deltas, method='LR_labeled', path_weights=None):
     model = train_PC(data_managers[0].xit, path_score, method)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
-    # test_pres = predict_label_PC_pathscore(model, data_managers[2].xit[:,non_zero_columns], deltas)
     test_pres = predict_label_PC_pathscore(model, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return model, test_pres
@@ -542,7 +515,6 @@ def run_PSO_PC(data_managers, deltas, method='LR_labeled', path_weights=None, no
     logger.info("training time: " + str(time.time() - start))
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
-    # test_pres = predict_label_PC_pathscore(model, data_managers[2].xit[:,non_zero_columns], deltas)
     test_pres = predict_label_PC_pathscore(model, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return model, test_pres
@@ -682,7 +654,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
             csv_writer.writerow(['Micro f1 avg'] + list(avg_m_metrics_result[1,:,2]))
             csv_writer.writerow(['Micro f1 std'] + list(std_m_metrics_result[1,:,2]))
             csv_writer.writerow([])
-    logger.info(logconfig.key_log(logconfig.END_PROGRAM, input_dir))
+    logger.info(logconfig.key_log(logconfig.END_PROGRAM, sub_dir))
     
 if __name__ == "__main__":
     log_filename = os.path.join(settings.log_dir, 'LR_SVM.log')
@@ -690,8 +662,8 @@ if __name__ == "__main__":
 
     pool = Pool(20)
     for input_dir in settings.data_dirs:
-        classifier_names = ['flatLR', 'levelLR', 'TDLR', 'BULR', 'WDLR_hard', 'PCLR', 
-                            'flatSVM', 'levelSVM', 'TDSVM', 'BUSVM', 'WDSVM_hard', 'PCSVM']
+        classifier_names = ['flatLR', 'TDLR', 'WDLR_hard', 'PCLR', 
+                            'flatSVM', 'TDSVM']
         for label_ratio in settings.label_ratios:
             pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
             # main(input_dir, label_ratio, settings.times, classifier_names)
