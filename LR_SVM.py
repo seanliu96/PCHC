@@ -147,8 +147,8 @@ def train_one_depth(data_managers_list, depth, deltas, method):
             unique_label = np.unique(label)
             if len(unique_label) == 0:
                 model = None
-                # unlabeled_pre_part = np.zeros((data_managers[1].xit.shape[0], ))
-                test_pre_part = np.zeros((data_managers[2].xit.shape[0], ))
+                # unlabeled_pre_part = np.zeros((data_managers[1].xit.shape[0], ), dtype=np.int32)
+                test_pre_part = np.zeros((data_managers[2].xit.shape[0], ), dtype=np.int32)
             elif len(unique_label) == 1:
                 model = None
                 # unlabeled_pre_part = np.array([unique_label[0]] * (data_managers[1].xit.shape[0] if data_managers[1] else 0))
@@ -169,8 +169,8 @@ def train_one_depth(data_managers_list, depth, deltas, method):
             unique_label = np.unique(label)
             if len(unique_label) == 0:
                 model = None
-                # unlabeled_pre_part = np.zeros((data_managers[1].xit.shape[0], ))
-                test_pre_part = np.zeros((data_managers[2].xit.shape[0], ))
+                # unlabeled_pre_part = np.zeros((data_managers[1].xit.shape[0], ), dtype=np.int32)
+                test_pre_part = np.zeros((data_managers[2].xit.shape[0], ), dtype=np.int32)
             elif len(unique_label) == 1:
                 model = None
                 # unlabeled_pre_part = np.array([unique_label[0]] * (data_managers[1].xit.shape[0] if data_managers[1] else 0))
