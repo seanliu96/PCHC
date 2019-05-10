@@ -41,9 +41,9 @@ def run_leaf(data_managers, deltas, method='LR_labeled'):
     # non_zero_indices = np.nonzero(data_managers[0].xit)
     # non_zero_columns = sorted(set(non_zero_indices[1]))
     if 'LR' in method:
-        model = LogisticRegression(solver='liblinear', multi_class='auto')
+        model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
     elif 'SVM' in method:
-        model = LinearSVC(multi_class='auto')
+        model = LinearSVC(multi_class='crammer_singer')
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
         # tf_idf.fit(data_managers[0].xit[:,non_zero_columns])
@@ -76,9 +76,9 @@ def train_level(data_xit, sims, method='LR_labeled'):
         tf_idf = None
     for depth in range(len(sims)):
         if 'LR' in method:
-            model = LogisticRegression(solver='liblinear', multi_class='auto')
+            model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
-            model = LinearSVC(multi_class='auto')
+            model = LinearSVC(multi_class='crammer_singer')
         if 'tf-idf' in method:
             # model.fit(tf_idf.transform(data_xit[:,non_zero_columns]), np.argmax(sims[depth], axis=1))
             model.fit(tf_idf.transform(data_xit), np.argmax(sims[depth], axis=1))
@@ -151,9 +151,9 @@ def train_one_depth(data_managers_list, depth, deltas, method):
         else:
             raise NotImplementedError
         if 'LR' in method:
-            model = LogisticRegression(solver='liblinear', multi_class='auto')
+            model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
-            model = LinearSVC(multi_class='auto')
+            model = LinearSVC(multi_class='crammer_singer')
         # non_zero_indices = np.nonzero(data_managers[0].xit)
         # non_zero_columns = sorted(set(non_zero_indices[1]))
         if 'tf-idf' in method:
@@ -162,7 +162,11 @@ def train_one_depth(data_managers_list, depth, deltas, method):
             tf_idf.fit(data_managers[0].xit)
             label = np.argmax(sim, axis=1)
             unique_label = np.unique(label)
-            if len(unique_label) == 1:
+            if len(unique_label) == 0:
+                model = None
+                # unlabeled_pre_part = np.zeros((data_managers[1].xit.shape[0], ))
+                test_pre_part = np.zeros((data_managers[2].xit.shape[0], ))
+            elif len(unique_label) == 1:
                 model = None
                 # unlabeled_pre_part = np.array([unique_label[0]] * (data_managers[1].xit.shape[0] if data_managers[1] else 0))
                 test_pre_part = np.array([unique_label[0]] * data_managers[2].xit.shape[0])
@@ -177,7 +181,11 @@ def train_one_depth(data_managers_list, depth, deltas, method):
             tf_idf = None
             label = np.argmax(sim, axis=1)
             unique_label = np.unique(label)
-            if len(unique_label) == 1:
+            if len(unique_label) == 0:
+                model = None
+                # unlabeled_pre_part = np.zeros((data_managers[1].xit.shape[0], ))
+                test_pre_part = np.zeros((data_managers[2].xit.shape[0], ))
+            elif len(unique_label) == 1:
                 model = None
                 # unlabeled_pre_part = np.array([unique_label[0]] * (data_managers[1].xit.shape[0] if data_managers[1] else 0))
                 test_pre_part = np.array([unique_label[0]] * data_managers[2].xit.shape[0])
@@ -295,9 +303,9 @@ def train_WD(data_xit, sims, method):
         tf_idf = None
     for depth in range(len(sims)):
         if 'LR' in method:
-            model = LogisticRegression(solver='liblinear', multi_class='auto')
+            model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
-            model = CalibratedClassifierCV(LinearSVC(multi_class='auto'))
+            model = CalibratedClassifierCV(LinearSVC(multi_class='crammer_singer'))
         if 'tf-idf' in method:
             # model.fit(tf_idf.transform(data_xit[:,non_zero_columns]), np.argmax(sims[depth], axis=1))
             model.fit(tf_idf.transform(data_xit), np.argmax(sims[depth], axis=1))
@@ -327,7 +335,10 @@ def predict_prob_WD_pathscore(model_list, data_xit, deltas=None, path_weights=No
                 delta_matrix = np.multiply(np.expand_dims(delta_matrix, axis=2), np.expand_dims(deltas[depth], axis=0))
                 delta_matrix = delta_matrix.reshape((-1, deltas[depth].shape[-1]))
             delta_matrix = delta_matrix.reshape((1, -1))
-            P_xcs_matrix = P_xcs_matrix * delta_matrix
+            try:
+                P_xcs_matrix = P_xcs_matrix * delta_matrix
+            except:
+                pass
         P_xcs_matrix = normalize(P_xcs_matrix, axis=1)
         P_xcs_matrix = P_xcs_matrix.reshape([N] + classes_size)  # N * C1 * C2 ... * Cn
     else:
@@ -429,9 +440,9 @@ def train_PC(data_xit, path_score, method):
     else:
         tf_idf = None
     if 'LR' in method:
-        model = LogisticRegression(solver='liblinear', multi_class='auto')
+        model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
     elif 'SVM' in method:
-        model = CalibratedClassifierCV(LinearSVC(multi_class='auto'))
+        model = CalibratedClassifierCV(LinearSVC(multi_class='crammer_singer'))
     data_xit_expanded = []
     sample_weight = []
     label_expanded = []
@@ -670,8 +681,8 @@ if __name__ == "__main__":
 
     pool = Pool(10)
     for input_dir in settings.data_dirs:
-        classifier_names = ['flatLR', 'levelLR', 'TDLR', 'BULR', 'WDLR_hard', 'WDLR(PSO)_hard', 'PCLR',
-                            'flatSVM', 'levelSVM', 'TDSVM', 'BUSVM', 'WDSVM_hard', 'WDSVM(PSO)_hard', 'PCSVM']
+        classifier_names = ['flatLR', 'levelLR', 'TDLR', 'BULR', 'WDLR_hard', 'PCLR', 
+                            'flatSVM', 'levelSVM', 'TDSVM', 'BUSVM', 'WDSVM_hard', 'PCSVM']
         for label_ratio in settings.label_ratios:
             pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
             # main(input_dir, label_ratio, settings.times, classifier_names)
