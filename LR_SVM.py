@@ -19,7 +19,7 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.feature_extraction.text import TfidfTransformer
 from pso import PSO
 
-def run_leaf(data_managers, deltas, method='LR_labeled'):
+def run_leaf(data_managers, deltas, C=1.0, method='LR_labeled'):
     logger = logging.getLogger(__name__)
     model_name = "flat" + method
     logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
@@ -39,9 +39,9 @@ def run_leaf(data_managers, deltas, method='LR_labeled'):
     start = time.time()
     max_depth = len(sims)
     if 'LR' in method:
-        model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
+        model = LogisticRegression(C=C, solver='lbfgs', multi_class='multinomial')
     elif 'SVM' in method:
-        model = LinearSVC(multi_class='crammer_singer')
+        model = LinearSVC(C=C, multi_class='crammer_singer')
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
         tf_idf.fit(data_managers[0].xit)
@@ -57,7 +57,7 @@ def run_leaf(data_managers, deltas, method='LR_labeled'):
     logger.info("predicting time: " + str(time.time() - start))
     return model, test_pre
 
-def train_level(data_xit, sims, method='LR_labeled'):
+def train_level(data_xit, sims, C=1.0, method='LR_labeled'):
     model_list = []
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
@@ -66,9 +66,9 @@ def train_level(data_xit, sims, method='LR_labeled'):
         tf_idf = None
     for depth in range(len(sims)):
         if 'LR' in method:
-            model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
+            model = LogisticRegression(C=C, solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
-            model = LinearSVC(multi_class='crammer_singer')
+            model = LinearSVC(C=C, multi_class='crammer_singer')
         if 'tf-idf' in method:
             model.fit(tf_idf.transform(data_xit), np.argmax(sims[depth], axis=1))
         else:
@@ -76,7 +76,7 @@ def train_level(data_xit, sims, method='LR_labeled'):
         model_list.append(model)
     return model_list
 
-def run_level(data_managers, deltas, method='LR_labeled'):
+def run_level(data_managers, deltas, C=1.0, method='LR_labeled'):
     logger = logging.getLogger(__name__)
     model_name = "level" + method
     logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
@@ -94,7 +94,7 @@ def run_level(data_managers, deltas, method='LR_labeled'):
         raise NotImplementedError
 
     start = time.time()
-    model_list = train_level(data_managers[0].xit, sims, method)
+    model_list = train_level(data_managers[0].xit, sims, C, method)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
     for depth in range(len(sims)):
@@ -106,7 +106,7 @@ def run_level(data_managers, deltas, method='LR_labeled'):
     logger.info("predicting time: " + str(time.time() - start))
     return model_list, test_pres
 
-def train_one_depth(data_managers_list, depth, deltas, method):
+def train_one_depth(data_managers_list, depth, deltas, C=1.0, method='LR_labeled'):
     model_list = []
     # unlabeled_cnt = 0
     test_cnt = 0
@@ -137,9 +137,9 @@ def train_one_depth(data_managers_list, depth, deltas, method):
         else:
             raise NotImplementedError
         if 'LR' in method:
-            model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
+            model = LogisticRegression(C=C, solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
-            model = LinearSVC(multi_class='crammer_singer')
+            model = LinearSVC(C=C, multi_class='crammer_singer')
         if 'tf-idf' in method:
             tf_idf = TfidfTransformer()
             tf_idf.fit(data_managers[0].xit)
@@ -201,7 +201,7 @@ def train_one_depth(data_managers_list, depth, deltas, method):
             test_pre[data_managers[2].true_idx] = test_pre_part
     return model_list, None, test_pre
 
-def run_TD(data_managers, deltas, method='LR_labeled'):
+def run_TD(data_managers, deltas, C=1.0, method='LR_labeled'):
     logger = logging.getLogger(__name__)
     if 'BU' in method:
         model_name = method
@@ -235,7 +235,7 @@ def run_TD(data_managers, deltas, method='LR_labeled'):
                     deltas=data_managers[2].deltas, sims=data_managers[2].sims, true_idx=None)]
     data_managers_list = [data_managers_d0]
     for depth in range(max_depth):
-        model_list, unlabeled_pre, test_pre = train_one_depth(data_managers_list, depth, deltas, method)
+        model_list, unlabeled_pre, test_pre = train_one_depth(data_managers_list, depth, deltas, C, method)
         model_lists.append(model_list)
         # unlabeled_pres.append(unlabeled_pre)
         test_pres.append(test_pre)
@@ -264,7 +264,7 @@ def run_TD(data_managers, deltas, method='LR_labeled'):
     logger.info("training and predicting time: " + str(time.time() - start))
     return model_lists, test_pres
 
-def run_BU(data_managers, deltas, method='LR_labeled'):
+def run_BU(data_managers, deltas, C=1.0, method='LR_labeled'):
     reverse_data_managers = [
         build_reverse_data_manager(data_managers[0], data_managers[0].name + '_reversed'),
         None,
@@ -273,10 +273,10 @@ def run_BU(data_managers, deltas, method='LR_labeled'):
     reverse_deltas.reverse()
     reverse_deltas.append(np.zeros((0, 0), dtype=np.int32))
     model_lists, test_pres = run_TD(
-        reverse_data_managers, reverse_deltas, method='BU' + method)
+        reverse_data_managers, reverse_deltas, C, method='BU' + method)
     return model_lists[::-1], test_pres[::-1]
 
-def train_WD(data_xit, sims, method):
+def train_WD(data_xit, sims, C=1.0, method='LR_labeled'):
     model_list = []
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
@@ -285,9 +285,9 @@ def train_WD(data_xit, sims, method):
         tf_idf = None
     for depth in range(len(sims)):
         if 'LR' in method:
-            model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
+            model = LogisticRegression(C=C, solver='lbfgs', multi_class='multinomial')
         elif 'SVM' in method:
-            model = CalibratedClassifierCV(LinearSVC(multi_class='crammer_singer'))
+            model = CalibratedClassifierCV(LinearSVC(C=C, multi_class='crammer_singer'))
         if 'tf-idf' in method:
             model.fit(tf_idf.transform(data_xit), np.argmax(sims[depth], axis=1))
         else:
@@ -325,7 +325,7 @@ def predict_prob_WD_pathscore(model_list, data_xit, deltas=None, path_weights=No
         P_xcs_matrix = np.zeros([0] + classes_size)
     return P_xcs_matrix
 
-def predict_WD_pathscore(model_list, data_xit, deltas=None, path_weights=None):
+def predict_WD_pathscore(model_list, data_xit, deltas=None, C=1.0, path_weights=None):
     P_xcs_matrix = predict_prob_WD_pathscore(model_list, data_xit, deltas=deltas, path_weights=path_weights)
     N = P_xcs_matrix.shape[0]
     classes_size = P_xcs_matrix.shape[1:]
@@ -338,7 +338,7 @@ def predict_WD_pathscore(model_list, data_xit, deltas=None, path_weights=None):
             Ps[j][i, max_index_list[j]] = 1
     return Ps
 
-def predict_label_WD_pathscore(model_list, data_xit, deltas=None, path_weights=None):
+def predict_label_WD_pathscore(model_list, data_xit, deltas=None, C=1.0, path_weights=None):
     data_xit_csr = data_xit.tocsr()
     y_pres = [None for k in range(len(model_list))]
     batch_size = 512
@@ -352,7 +352,7 @@ def predict_label_WD_pathscore(model_list, data_xit, deltas=None, path_weights=N
                 y_pres[k] = np.concatenate([y_pres[k], np.argmax(Ps[k], axis=1)])
     return y_pres
 
-def run_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, path_weights=None):
+def run_WD(data_managers, deltas, C=1.0, method='LR_labeled', soft_pathscore=True, path_weights=None):
     logger = logging.getLogger(__name__)
     model_name = 'WD_' + ("soft_" if soft_pathscore else "hard_") + method
     logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
@@ -367,7 +367,7 @@ def run_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, path
     else:
         raise NotImplementedError
     start = time.time()
-    model_list = train_WD(data_managers[0].xit, sims, method)
+    model_list = train_WD(data_managers[0].xit, sims, C, method)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
     test_pres = predict_label_WD_pathscore(model_list, data_managers[2].xit,
@@ -375,7 +375,7 @@ def run_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, path
     logger.info("predicting time: " + str(time.time() - start))
     return model_list, test_pres
 
-def run_PSO_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, path_weights=None, nos=None):
+def run_PSO_WD(data_managers, deltas, C=1.0, method='LR_labeled', soft_pathscore=True, path_weights=None, nos=None):
     logger = logging.getLogger(__name__)
     model_name = 'WD(PSO)_' + ("soft_" if soft_pathscore else "hard_") + method
     logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
@@ -392,7 +392,7 @@ def run_PSO_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, 
     else:
         raise NotImplementedError
     start = time.time()
-    model_list = train_WD(data_managers[0].xit, sims, method)
+    model_list = train_WD(data_managers[0].xit, sims, C, method)
     def score_function(path_weights):
         labeled_pres = predict_label_WD_pathscore(model_list, data_managers[0].xit,
                                             deltas=(None if soft_pathscore else deltas), path_weights=path_weights)
@@ -408,7 +408,7 @@ def run_PSO_WD(data_managers, deltas, method='LR_labeled', soft_pathscore=True, 
     logger.info("predicting time: " + str(time.time() - start))
     return model_list, test_pres
 
-def train_PC(data_xit, path_score, method):
+def train_PC(data_xit, path_score, C=1.0, method='LR_labeled'):
     
     if 'tf-idf' in method:
         tf_idf = TfidfTransformer()
@@ -416,9 +416,9 @@ def train_PC(data_xit, path_score, method):
     else:
         tf_idf = None
     if 'LR' in method:
-        model = LogisticRegression(solver='lbfgs', multi_class='multinomial')
+        model = LogisticRegression(C=C, solver='lbfgs', multi_class='multinomial')
     elif 'SVM' in method:
-        model = CalibratedClassifierCV(LinearSVC(multi_class='crammer_singer'))
+        model = CalibratedClassifierCV(LinearSVC(C=C, multi_class='crammer_singer'))
     data_xit_csr = data_xit.tocsr()
     data_xit_expanded = []
     sample_weight = []
@@ -462,7 +462,7 @@ def predict_label_PC_pathscore(model, data_xit, deltas):
     y_pres.reverse()
     return y_pres
 
-def run_PC(data_managers, deltas, method='LR_labeled', path_weights=None):
+def run_PC(data_managers, deltas, C=1.0, method='LR_labeled', path_weights=None):
     logger = logging.getLogger(__name__)
     model_name = "PC" + method
     logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
@@ -478,14 +478,14 @@ def run_PC(data_managers, deltas, method='LR_labeled', path_weights=None):
         raise NotImplementedError
     start = time.time()
     path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-    model = train_PC(data_managers[0].xit, path_score, method)
+    model = train_PC(data_managers[0].xit, path_score, C, method)
     logger.info("training time: " + str(time.time() - start))
     start = time.time()
     test_pres = predict_label_PC_pathscore(model, data_managers[2].xit, deltas)
     logger.info("predicting time: " + str(time.time() - start))
     return model, test_pres
 
-def run_PSO_PC(data_managers, deltas, method='LR_labeled', path_weights=None, nos=None):
+def run_PSO_PC(data_managers, deltas, C=1.0, method='LR_labeled', path_weights=None, nos=None):
     logger = logging.getLogger(__name__)
     model_name = "PC(PSO)" + method
     logger.info(logconfig.key_log(logconfig.MODEL_NAME, model_name))
@@ -504,14 +504,14 @@ def run_PSO_PC(data_managers, deltas, method='LR_labeled', path_weights=None, no
     start = time.time()
     def score_function(path_weights):
         path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-        model = train_PC(data_managers[0].xit, path_score, method)
+        model = train_PC(data_managers[0].xit, path_score, C, method)
         labeled_pres = predict_label_PC_pathscore(model, data_managers[0].xit, deltas)
         return compute_overall_p_r_f1(labels, labeled_pres, nos)[2][settings.main_metric]
     pso = PSO(path_weights, score_function, group_size=settings.pso_group_size, min_x=settings.pso_min_x, max_x=settings.pso_max_x)
     pso.update(c1=settings.pso_c1, c2=settings.pso_c2, w=settings.pso_w, max_iter=settings.pso_max_iter, patience=settings.pso_patience)
     path_weights = pso.get_best_x()
     path_score = compute_path_score(sims, deltas, path_weights=path_weights)
-    model = train_PC(data_managers[0].xit, path_score, method)
+    model = train_PC(data_managers[0].xit, path_score, C, method)
     logger.info("training time: " + str(time.time() - start))
     logger.info('best_path_weight: %s' % (str(path_weights)))
     start = time.time()
@@ -531,49 +531,49 @@ def run_classifiers(classifier_name, data_managers, method, **kw):
     
     if 'LR' in classifier_name:
         if classifier_name == 'flatLR':
-            return run_leaf(data_managers, kw['deltas'], method='LR_'+method)
+            return run_leaf(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method)
         elif classifier_name == 'levelLR':
-            return run_level(data_managers, kw['deltas'], method='LR_'+method)
+            return run_level(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method)
         elif classifier_name == 'TDLR':
-            return run_TD(data_managers, kw['deltas'], method='LR_'+method)
+            return run_TD(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method)
         elif classifier_name == 'BULR':
-            return run_BU(data_managers, kw['deltas'], method='LR_'+method)
+            return run_BU(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method)
         elif classifier_name == 'WDLR_soft':
-            return run_WD(data_managers, kw['deltas'], method='LR_'+method, soft_pathscore=True, path_weights=kw['path_weights'])
+            return run_WD(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method, soft_pathscore=True, path_weights=kw['path_weights'])
         elif classifier_name == 'WDLR(PSO)_soft':
-            return run_PSO_WD(data_managers, kw['deltas'], method='LR_'+method, soft_pathscore=True, path_weights=kw['path_weights'], nos=kw['nos'])
+            return run_PSO_WD(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method, soft_pathscore=True, path_weights=kw['path_weights'], nos=kw['nos'])
         elif classifier_name == 'WDLR_hard':
-            return run_WD(data_managers, kw['deltas'], method='LR_'+method, soft_pathscore=False, path_weights=kw['path_weights'])
+            return run_WD(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method, soft_pathscore=False, path_weights=kw['path_weights'])
         elif classifier_name == 'WDLR(PSO)_hard':
-            return run_PSO_WD(data_managers, kw['deltas'], method='LR_'+method, soft_pathscore=False, path_weights=kw['path_weights'], nos=kw['nos'])
+            return run_PSO_WD(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method, soft_pathscore=False, path_weights=kw['path_weights'], nos=kw['nos'])
         elif classifier_name == 'PCLR':
-            return run_PC(data_managers, kw['deltas'], method='LR_'+method, path_weights=kw['path_weights'])
+            return run_PC(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method, path_weights=kw['path_weights'])
         elif classifier_name == 'PCLR(PSO)':
-            return run_PSO_PC(data_managers, kw['deltas'], method='LR_'+method, path_weights=kw['path_weights'], nos=kw['nos'])
+            return run_PSO_PC(data_managers, kw['deltas'], C=kw['C'], method='LR_'+method, path_weights=kw['path_weights'], nos=kw['nos'])
     elif 'SVM' in classifier_name:
         if classifier_name == 'flatSVM':
-            return run_leaf(data_managers, kw['deltas'], method='SVM_'+method)
+            return run_leaf(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method)
         elif classifier_name == 'levelSVM':
-            return run_level(data_managers, kw['deltas'], method='SVM_'+method)
+            return run_level(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method)
         elif classifier_name == 'TDSVM':
-            return run_TD(data_managers, kw['deltas'], method='SVM_'+method)
+            return run_TD(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method)
         elif classifier_name == 'BUSVM':
-            return run_BU(data_managers, kw['deltas'], method='SVM_'+method)
+            return run_BU(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method)
         elif classifier_name == 'WDSVM_soft':
-            return run_WD(data_managers, kw['deltas'], method='SVM_'+method, soft_pathscore=True, path_weights=kw['path_weights'])
+            return run_WD(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method, soft_pathscore=True, path_weights=kw['path_weights'])
         elif classifier_name == 'WDSVM(PSO)_soft':
-            return run_PSO_WD(data_managers, kw['deltas'], method='SVM_'+method, soft_pathscore=True, path_weights=kw['path_weights'], nos=kw['nos'])
+            return run_PSO_WD(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method, soft_pathscore=True, path_weights=kw['path_weights'], nos=kw['nos'])
         elif classifier_name == 'WDSVM_hard':
-            return run_WD(data_managers, kw['deltas'], method='SVM_'+method, soft_pathscore=False, path_weights=kw['path_weights'])
+            return run_WD(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method, soft_pathscore=False, path_weights=kw['path_weights'])
         elif classifier_name == 'WDSVM(PSO)_hard':
-            return run_PSO_WD(data_managers, kw['deltas'], method='SVM_'+method, soft_pathscore=False, path_weights=kw['path_weights'], nos=kw['nos'])
+            return run_PSO_WD(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method, soft_pathscore=False, path_weights=kw['path_weights'], nos=kw['nos'])
         elif classifier_name == 'PCSVM':
-            return run_PC(data_managers, kw['deltas'], method='SVM_'+method, path_weights=kw['path_weights'])
+            return run_PC(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method, path_weights=kw['path_weights'])
         elif classifier_name == 'PCSVM(PSO)':
-            return run_PSO_PC(data_managers, kw['deltas'], method='SVM_'+method, path_weights=kw['path_weights'], nos=kw['nos'])
+            return run_PSO_PC(data_managers, kw['deltas'], C=kw['C'], method='SVM_'+method, path_weights=kw['path_weights'], nos=kw['nos'])
     raise NotImplementedError('%s is not supported!' % (classifier_name))
         
-def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_names=None):
+def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_names=None, C=1.0):
     logger = logging.getLogger(__name__)
 
     if label_ratio == 1.0:
@@ -593,7 +593,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
     if label_ratio == 1.0:
         times = 1
     for mode in ["labeled", "dataless"]:
-        metrics_result = np.zeros((times, 2, len(classifier_names), 3, 2)) # times, methods, depth+1, [[(M_precision,m_precision), (M_recall,m_recall),  (M_f1, m_f1)], ...]
+        metrics_result = np.zeros((times, 2, len(classifier_names)*len(settings.Cs), 3, 2)) # times, methods, depth+1, [[(M_precision,m_precision), (M_recall,m_recall),  (M_f1, m_f1)], ...]
 
         for i in range(times):
             method_index = 0
@@ -611,22 +611,28 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
                 continue
 
             for j, classifier_name in enumerate(classifier_names):
-                result = run_classifiers(classifier_name, data_managers, mode, **kw)
-                if len(data_managers[2].labels) == len(result[1]):
-                    metrics_result[i,0,j] = compute_p_r_f1(data_managers[2].labels[-1], result[1][-1])
-                    metrics_result[i,1,j] = compute_overall_p_r_f1(data_managers[2].labels, result[1], nos)
-                else:
-                    metrics_result[i,0,j] = compute_p_r_f1(data_managers[2].labels[-1], result[1])
-                    metrics_result[i,1,j] = compute_hier_p_r_f1(data_managers[2].labels[-1], result[1], nos, hier_tree)
+                for k, C in enumerate(settings.Cs):
+                    kw['C'] = C
+                    result = run_classifiers(classifier_name, data_managers, mode, **kw)
+                    if len(data_managers[2].labels) == len(result[1]):
+                        metrics_result[i,0,j*len(settings.Cs)+k] = compute_p_r_f1(data_managers[2].labels[-1], result[1][-1])
+                        metrics_result[i,1,j*len(settings.Cs)+k] = compute_overall_p_r_f1(data_managers[2].labels, result[1], nos)
+                    else:
+                        metrics_result[i,0,j*len(settings.Cs)+k] = compute_p_r_f1(data_managers[2].labels[-1], result[1])
+                        metrics_result[i,1,j*len(settings.Cs)+k] = compute_hier_p_r_f1(data_managers[2].labels[-1], result[1], nos, hier_tree)
 
         avg_M_metrics_result = np.mean(metrics_result[:,:,:,:,0], axis=0)
         std_M_metrics_result = np.std(metrics_result[:,:,:,:,0], axis=0)
         avg_m_metrics_result = np.mean(metrics_result[:,:,:,:,1], axis=0)
         std_m_metrics_result = np.std(metrics_result[:,:,:,:,1], axis=0)
         
+        headers = []
+        for j, classifier_name in enumerate(classifier_names):
+            for k, C in enumerate(settings.Cs):
+                headers.append('%s_C_%.2f' % (classifier_name, C))
         with open(os.path.join(input_dir, str(label_ratio), 'LR_SVM_%s.csv' % (mode)), 'w') as f:
             csv_writer = csv.writer(f)
-            csv_writer.writerow(['Leaf'] + classifier_names)
+            csv_writer.writerow(['Leaf'] + headers)
             csv_writer.writerow(['Macro precision avg'] + list(avg_M_metrics_result[0,:,0]))
             csv_writer.writerow(['Macro precision std'] + list(std_M_metrics_result[0,:,0]))
             csv_writer.writerow(['Micro precision avg'] + list(avg_m_metrics_result[0,:,0]))
@@ -640,7 +646,7 @@ def main(input_dir=settings.data_dir_20ng, label_ratio=0.1, times=1, classifier_
             csv_writer.writerow(['Micro f1 avg'] + list(avg_m_metrics_result[0,:,2]))
             csv_writer.writerow(['Micro f1 std'] + list(std_m_metrics_result[0,:,2]))
             csv_writer.writerow([])
-            csv_writer.writerow(['Overall'] + classifier_names)
+            csv_writer.writerow(['Overall'] + headers)
             csv_writer.writerow(['Macro precision avg'] + list(avg_M_metrics_result[1,:,0]))
             csv_writer.writerow(['Macro precision std'] + list(std_M_metrics_result[1,:,0]))
             csv_writer.writerow(['Micro precision avg'] + list(avg_m_metrics_result[1,:,0]))
@@ -660,10 +666,11 @@ if __name__ == "__main__":
     log_filename = os.path.join(settings.log_dir, 'LR_SVM.log')
     logconfig.logging.config.dictConfig(logconfig.logging_config_dict('INFO', log_filename))
 
+    classifier_names = ['flatLR', 'TDLR', 'WDLR_hard', 'PCLR', 
+                            'flatSVM', 'TDSVM']
+
     pool = Pool(20)
     for input_dir in settings.data_dirs:
-        classifier_names = ['flatLR', 'TDLR', 'WDLR_hard', 'PCLR', 
-                            'flatSVM', 'TDSVM']
         for label_ratio in settings.label_ratios:
             pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
             # main(input_dir, label_ratio, settings.times, classifier_names)
