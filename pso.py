@@ -3,21 +3,17 @@ import numpy as np
 import logging
 import logging.config
 
-def regularize_x(x, min_x, max_x, decay):
+def regularize_xv(x, v, min_x, max_x, decay):
     while True:
         if x < min_x:
             x = min_x - decay * (x - min_x)
+            v = -v * decay
         elif x > max_x:
             x = max_x - decay * (x - max_x)
+            v = -v * decay
         else:
             break
-    return x
-"""
-def regularize_x(x):
-    if x < Particle.min_x:
-        x = Particle.min_x - w * (x - Particle.min_x)
-    return x
-"""
+    return x, v
 
 
 class Particle(object):
@@ -35,7 +31,7 @@ class Particle(object):
         rand2 = np.random.rand(self.v.shape[0])
         self.v = w * self.v + c1 * rand1 * (self.best_x - self.x) + c2 * rand2 * (best_x - self.x)
         self.x = self.x + self.v
-        self.x = np.vectorize(regularize_x)(self.x, self.min_x, self.max_x, w)
+        self.x, self.v = np.vectorize(regularize_xv)(self.x, self.v, self.min_x, self.max_x, w)
     
     def update_score(self, score):
         self.score = score

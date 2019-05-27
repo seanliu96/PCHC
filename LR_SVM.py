@@ -667,7 +667,7 @@ if __name__ == "__main__":
     logconfig.logging.config.dictConfig(logconfig.logging_config_dict('INFO', log_filename))
 
     classifier_names = ['flatLR', 'TDLR', 'WDLR_hard', 'PCLR', 
-                            'flatSVM', 'TDSVM']
+                        'flatSVM', 'TDSVM']
 
     pool = Pool(20)
     for input_dir in settings.data_dirs:
