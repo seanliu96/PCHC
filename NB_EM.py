@@ -1235,7 +1235,7 @@ if __name__ == "__main__":
         'flatNB', 'NBMC', 'TDNB', 'WDNB_hard', 'PCNB', 'WDNB(PSO)_hard', 'PCNB(PSO)',
         'flatEM', 'EMMC', 'TDEM', 'WDEM_hard', 'PCEM', 'WDEM(PSO)_hard', 'PCEM(PSO)']
         
-    pool = Pool()
+    pool = Pool(10)
     for input_dir in settings.data_dirs:
         for label_ratio in settings.label_ratios:
             pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))

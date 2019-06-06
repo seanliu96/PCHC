@@ -666,10 +666,10 @@ if __name__ == "__main__":
     log_filename = os.path.join(settings.log_dir, 'LR_SVM.log')
     logconfig.logging.config.dictConfig(logconfig.logging_config_dict('INFO', log_filename))
 
-    classifier_names = ['flatLR', 'TDLR', 'WDLR_hard', 'PCLR', 
+    classifier_names = ['flatLR', 'TDLR', 'WDLR_hard', 'PCLR', 'WDLR(PSO)_hard', 'PCLR(PSO)',
                         'flatSVM', 'TDSVM']
 
-    pool = Pool(20)
+    pool = Pool(10)
     for input_dir in settings.data_dirs:
         for label_ratio in settings.label_ratios:
             pool.apply_async(main, args=(input_dir, label_ratio, settings.times, classifier_names))
